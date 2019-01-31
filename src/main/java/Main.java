@@ -21,6 +21,8 @@ import edu.wpi.first.vision.VisionThread;
 
 import org.opencv.core.Mat;
 
+
+
 public final class Main {
 	private static String configFile = "/boot/frc.json";
 
