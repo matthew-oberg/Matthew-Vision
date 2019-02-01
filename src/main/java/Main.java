@@ -34,6 +34,7 @@ import org.opencv.imgproc.*;
 import org.opencv.objdetect.*;
 
 public final class Main {
+	
 	private static String configFile = "/boot/frc.json";
 
 	@SuppressWarnings("MemberName")
@@ -44,9 +45,16 @@ public final class Main {
 		public JsonElement streamConfig;
 	}
 
-	public static int team;
-	public static boolean server;
-	public static List<CameraConfig> cameraConfigs = new ArrayList<>();
+	private static int team;
+	private static boolean server;
+	private static List<CameraConfig> cameraConfigs = new ArrayList<>();
+	
+	private static final Object imgLock = new Object();
+	
+	private static double zeroCenterX = 0;
+	private static double zeroCenterY = 0;
+	private static double oneCenterX = 0;
+	private static double oneCenterY = 0;
 	
 	public static void parseError(String str) {
 		System.err.println("config error in '" + configFile + "': " + str);
@@ -149,18 +157,8 @@ public final class Main {
 		return camera;
 	}
 	
-	public static class MyPipeline implements VisionPipeline {
-		public int val;
-
-		@Override
-		public void process(Mat mat) {
-		val += 1;
-		}
-	}
-	
 	public static class DetectDouble implements VisionPipeline {
 
-		//Outputs
 		private Mat hsvThresholdOutput = new Mat();
 		private ArrayList<MatOfPoint> findContoursOutput = new ArrayList<MatOfPoint>();
 
@@ -197,8 +195,7 @@ public final class Main {
 			new Scalar(hue[1], sat[1], val[1]), out);
 		}
 
-		private void findContours(Mat input, boolean externalOnly,
-			List<MatOfPoint> contours) {
+		private void findContours(Mat input, boolean externalOnly, List<MatOfPoint> contours) {
 			Mat hierarchy = new Mat();
 			contours.clear();
 			int mode;
@@ -236,10 +233,21 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 1) {
-			VisionThread visionThread = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {});	
+			VisionThread visionThread = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {
+				if (!pipeline.findContoursOutput().isEmpty()) {
+					Rect zero = Imgproc.boundingRect(pipeline.findContoursOutput().get(0));
+					Rect one = Imgproc.boundingRect(pipeline.findContoursOutput().get(1));
+					synchronized (imgLock) {
+						zeroCenterX = zero.x + (zero.width / 2);
+						zeroCenterY = zero.y + (zero.width / 2);
+						oneCenterX = one.x + (one.width / 2);
+						oneCenterY = one.y + (one.width / 2);
+					}
+				}
+			});
 			visionThread.start();
 		}
-
+		
 		for (;;) {
 			try {
 				Thread.sleep(10000);
