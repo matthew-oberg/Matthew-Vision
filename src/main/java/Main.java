@@ -22,6 +22,7 @@ import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoSource;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.*;
 import edu.wpi.first.vision.VisionPipeline;
 import edu.wpi.first.vision.VisionThread;
 
@@ -226,6 +227,17 @@ public final class Main {
 			System.out.println("Setting up NetworkTables client for team " + team);
 			ntinst.startClientTeam(team);
 		}
+		
+		NetworkTable table = ntinst.getTable("vision");
+		NetworkTableEntry zeroX = table.getEntry("zeroX");
+		NetworkTableEntry zeroY = table.getEntry("zeroY");
+		NetworkTableEntry oneX = table.getEntry("oneX");
+		NetworkTableEntry oneY = table.getEntry("oneY");
+		
+		zeroX.setDouble(zeroCenterX);
+		zeroY.setDouble(zeroCenterY);
+		oneX.setDouble(oneCenterX);
+		oneY.setDouble(oneCenterY);
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
