@@ -245,7 +245,7 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 1) {
-			VisionThread visionThread = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {
+			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
 				if (!pipeline.findContoursOutput().isEmpty()) {
 					Rect zero = Imgproc.boundingRect(pipeline.findContoursOutput().get(0));
 					Rect one = Imgproc.boundingRect(pipeline.findContoursOutput().get(1));
