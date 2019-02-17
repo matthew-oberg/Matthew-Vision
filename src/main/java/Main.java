@@ -260,7 +260,7 @@ public final class Main {
 			visionThread.start();
 		}
 		
-		for (;;) {
+		while (true) {
 			try {
 				Thread.sleep(10000);
 			} catch (InterruptedException ex) {
