@@ -52,11 +52,6 @@ public final class Main {
 	
 	private static final Object imgLock = new Object();
 	
-	private static double zeroCenterX = 0;
-	private static double zeroCenterY = 0;
-	private static double oneCenterX = 0;
-	private static double oneCenterY = 0;
-	
 	public static void parseError(String str) {
 		System.err.println("config error in '" + configFile + "': " + str);
 	}
@@ -170,11 +165,10 @@ public final class Main {
 		@Override
 		public void process(Mat source0) {
 			Mat hsvThresholdInput = source0;
-			double[] hsvThresholdHue = {74.46043165467626, 120.1023890784983};
-			double[] hsvThresholdSaturation = {32.10431654676259, 76.58703071672356};
-			double[] hsvThresholdValue = {210.97122302158272, 255.0};
+			double[] hsvThresholdHue = {82.55395683453237, 115.49488054607508};
+			double[] hsvThresholdSaturation = {98.60611510791367, 176.67235494880546};
+			double[] hsvThresholdValue = {231.60971223021582, 255.0};
 			hsvThreshold(hsvThresholdInput, hsvThresholdHue, hsvThresholdSaturation, hsvThresholdValue, hsvThresholdOutput);
-
 			Mat findContoursInput = hsvThresholdOutput;
 			boolean findContoursExternalOnly = false;
 			findContours(findContoursInput, findContoursExternalOnly, findContoursOutput);
@@ -189,14 +183,13 @@ public final class Main {
 			return findContoursOutput;
 		}
 
-		private void hsvThreshold(Mat input, double[] hue, double[] sat, double[] val,
-			Mat out) {
+		private void hsvThreshold(Mat input, double[] hue, double[] sat, double[] val, Mat out) {
 			Imgproc.cvtColor(input, out, Imgproc.COLOR_BGR2HSV);
-			Core.inRange(out, new Scalar(hue[0], sat[0], val[0]),
-			new Scalar(hue[1], sat[1], val[1]), out);
+			Core.inRange(out, new Scalar(hue[0], sat[0], val[0]), new Scalar(hue[1], sat[1], val[1]), out);
 		}
 
-		private void findContours(Mat input, boolean externalOnly, List<MatOfPoint> contours) {
+		private void findContours(Mat input, boolean externalOnly,
+			List<MatOfPoint> contours) {
 			Mat hierarchy = new Mat();
 			contours.clear();
 			int mode;
@@ -233,28 +226,27 @@ public final class Main {
 		NetworkTableEntry zeroY = table.getEntry("zeroY");
 		NetworkTableEntry oneX = table.getEntry("oneX");
 		NetworkTableEntry oneY = table.getEntry("oneY");
-		
-		zeroX.setDouble(zeroCenterX);
-		zeroY.setDouble(zeroCenterY);
-		oneX.setDouble(oneCenterX);
-		oneY.setDouble(oneCenterY);
+		NetworkTableEntry isPipeline = table.getEntry("pipeline");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
 			cameras.add(startCamera(cameraConfig));
 		}
 
-		if (cameras.size() >= 1) {
+		if (cameras.size() >= 2) {
 			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
 				if (!pipeline.findContoursOutput().isEmpty()) {
+					isPipeline.setBoolean(true);
 					Rect zero = Imgproc.boundingRect(pipeline.findContoursOutput().get(0));
 					Rect one = Imgproc.boundingRect(pipeline.findContoursOutput().get(1));
 					synchronized (imgLock) {
-						zeroCenterX = zero.x + (zero.width / 2);
-						zeroCenterY = zero.y + (zero.width / 2);
-						oneCenterX = one.x + (one.width / 2);
-						oneCenterY = one.y + (one.width / 2);
+						zeroX.setDouble(zero.x + (zero.width / 2));
+						zeroY.setDouble(zero.y + (zero.width / 2));
+						oneX.setDouble(one.x + (one.width / 2));
+						oneY.setDouble(one.y + (one.width / 2));
 					}
+				} else {
+					isPipeline.setBoolean(false);
 				}
 			});
 			visionThread.start();
