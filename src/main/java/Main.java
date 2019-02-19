@@ -351,11 +351,12 @@ public final class Main {
 		}
 		
 		NetworkTable table = ntinst.getTable("vision");
-		NetworkTableEntry zeroX = table.getEntry("zeroX");
-		NetworkTableEntry zeroY = table.getEntry("zeroY");
-		NetworkTableEntry oneX = table.getEntry("oneX");
-		NetworkTableEntry oneY = table.getEntry("oneY");
-		NetworkTableEntry contoursCount = table.getEntry("contoursCount");
+		NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
+		NetworkTableEntry hatchZeroY = table.getEntry("hatchZeroY");
+		NetworkTableEntry hatchOneX = table.getEntry("hatchOneX");
+		NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
+		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
+		NetworkTableEntry debug = table.getEntry("debug");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
@@ -364,19 +365,20 @@ public final class Main {
 
 		if (cameras.size() >= 2) { // both cameras exist
 			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
-
+				synchronized (imgLock) { debug.setNumber(1); }
                 ArrayList<Contour> contours = pipeline.filterContoursOutput().stream()
                         .map(mat -> {
                             Rect rect = Imgproc.boundingRect(mat);
+							synchronized (imgLock) { debug.setNumber(1.5); }
                             return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
                         }).sorted().collect(Collectors.toCollection(ArrayList::new));
-
+				synchronized (imgLock) { debug.setNumber(2); }
                 if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
                     contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
-
+				synchronized (imgLock) { debug.setNumber(3); }
                 if (!contours.isEmpty() && contours.get(contours.size()-1).direction == Direction.LEFT)
                     contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
-
+				synchronized (imgLock) { debug.setNumber(4); }
                 ArrayList<ContourPair> pairs = new ArrayList<>();
                 ContourPair currentPair = new ContourPair();
                 for (Contour contour : contours) {
@@ -390,30 +392,30 @@ public final class Main {
                         }
                     }
                 }
-
+				synchronized (imgLock) { debug.setNumber(5); }
                 double center = 184; // TODO: yay for magic numbers
                 pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
-
+				synchronized (imgLock) { debug.setNumber(6); }
 				if (!pairs.isEmpty()) {
 				    ContourPair pair = pairs.get(0);
 					synchronized (imgLock) {
-                        zeroX.setDouble(pair.left.center.x);
-                        zeroY.setDouble(pair.left.center.y);
-                        oneX.setDouble(pair.right.center.x);
-                        oneY.setDouble(pair.right.center.y);
+                        hatchZeroX.setDouble(pair.left.center.x);
+                        hatchZeroY.setDouble(pair.left.center.y);
+                        hatchOneX.setDouble(pair.right.center.x);
+                        hatchOneY.setDouble(pair.right.center.y);
 					}
 					
 					//x: (0, 320)
 				} else {
 					synchronized (imgLock) {
-						zeroX.setDouble(Double.MAX_VALUE / 2);
-						zeroY.setDouble(Double.MAX_VALUE / 2);
-						oneX.setDouble(Double.MAX_VALUE / 2);
-						oneY.setDouble(Double.MAX_VALUE / 2);
+						hatchZeroX.setDouble(Double.MAX_VALUE / 2);
+						hatchZeroY.setDouble(Double.MAX_VALUE / 2);
+						hatchOneX.setDouble(Double.MAX_VALUE / 2);
+						hatchOneY.setDouble(Double.MAX_VALUE / 2);
 					}
 				}
 				synchronized (imgLock) {
-					contoursCount.setDouble(pipeline.filterContoursOutput().size());
+					hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
 				}
 			});
 			visionThread.start();
@@ -423,20 +425,19 @@ public final class Main {
 			try {
 				Thread.sleep(10000);
 			} catch (InterruptedException ex) {
+				debug.setNumber(-1);
 				return;
 			}
 		}
 	}
 	
 	private static Direction getDirection(MatOfPoint contour) {
-		Rect rect = Imgproc.boundingRect(contour);
-		
-		Point left = null;
-		Point right = null;
+		Point left = new Point(Double.MAX_VALUE, 0);
+		Point right = new Point(Double.MIN_VALUE, 0);
 		for (Point p : contour.toArray()) {
-			if (p.x == rect.x)
+			if (p.x < left.x)
 				left = p;
-			if (p.x == rect.x + rect.width)
+			if (p.x > right.x)
 				right = p;
 		}
 		
