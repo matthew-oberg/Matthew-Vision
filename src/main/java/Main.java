@@ -3,12 +3,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.HashMap;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -28,11 +22,7 @@ import edu.wpi.first.vision.VisionThread;
 
 import org.opencv.core.Mat;
 import org.opencv.core.*;
-import org.opencv.core.Core.*;
-import org.opencv.features2d.FeatureDetector;
-import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.*;
-import org.opencv.objdetect.*;
 
 public final class Main {
 	
@@ -226,7 +216,6 @@ public final class Main {
 		 * @param hue The min and max hue
 		 * @param sat The min and max saturation
 		 * @param val The min and max value
-		 * @param output The image in which to store the output.
 		 */
 		private void hsvThreshold(Mat input, double[] hue, double[] sat, double[] val, Mat out) {
 			Imgproc.cvtColor(input, out, Imgproc.COLOR_BGR2HSV);
@@ -236,9 +225,6 @@ public final class Main {
 		/**
 		 * Sets the values of pixels in a binary image to their distance to the nearest black pixel.
 		 * @param input The image on which to perform the Distance Transform.
-		 * @param type The Transform.
-		 * @param maskSize the size of the mask.
-		 * @param output The image in which to store the output.
 		 */
 		private void findContours(Mat input, boolean externalOnly, List<MatOfPoint> contours) {
 			Mat hierarchy = new Mat();
@@ -263,7 +249,6 @@ public final class Main {
 		 * @param maxWidth maximum width
 		 * @param minHeight minimum height
 		 * @param maxHeight maximimum height
-		 * @param Solidity the minimum and maximum solidity of a contour
 		 * @param minVertexCount minimum vertex Count of the contours
 		 * @param maxVertexCount maximum vertex Count
 		 * @param minRatio minimum ratio of width to height
@@ -325,11 +310,16 @@ public final class Main {
 		}
 		
 		NetworkTable table = ntinst.getTable("vision");
-		NetworkTableEntry zeroX = table.getEntry("zeroX");
-		NetworkTableEntry zeroY = table.getEntry("zeroY");
-		NetworkTableEntry oneX = table.getEntry("oneX");
-		NetworkTableEntry oneY = table.getEntry("oneY");
-		NetworkTableEntry contoursCount = table.getEntry("contoursCount");
+		NetworkTableEntry ballZeroX = table.getEntry("ballZeroX");
+		NetworkTableEntry ballZeroY = table.getEntry("ballZeroY");
+		NetworkTableEntry ballOneX = table.getEntry("ballOneX");
+		NetworkTableEntry ballOneY = table.getEntry("ballOneY");
+		NetworkTableEntry ballContoursCount = table.getEntry("ballContoursCount");
+		NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
+		NetworkTableEntry hatchZeroY = table.getEntry("hatchZeroY");
+		NetworkTableEntry hatchOneX = table.getEntry("hatchOneX");
+		NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
+		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
@@ -337,31 +327,57 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 2) {
-			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
+			VisionThread visionThreadBall = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {
 				if (pipeline.filterContoursOutput().size() >= 2) {
 					Rect zero = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
 					Rect one = Imgproc.boundingRect(pipeline.filterContoursOutput().get(1));
 					synchronized (imgLock) {
-						zeroX.setDouble(zero.x + (zero.width / 2));
-						zeroY.setDouble(zero.y + (zero.width / 2));
-						oneX.setDouble(one.x + (one.width / 2));
-						oneY.setDouble(one.y + (one.width / 2));
+						ballZeroX.setDouble(zero.x + (zero.width / 2));
+						ballZeroY.setDouble(zero.y + (zero.width / 2));
+						ballOneX.setDouble(one.x + (one.width / 2));
+						ballOneY.setDouble(one.y + (one.width / 2));
+					}
+
+					//x: (0, 320)
+				} else {
+					synchronized (imgLock) {
+						ballZeroX.setDouble(Double.MAX_VALUE / 2);
+						ballZeroY.setDouble(Double.MAX_VALUE / 2);
+						ballOneX.setDouble(Double.MAX_VALUE / 2);
+						ballOneY.setDouble(Double.MAX_VALUE / 2);
+					}
+				}
+				synchronized (imgLock) {
+					ballContoursCount.setDouble(pipeline.filterContoursOutput().size());
+				}
+			});
+			visionThreadBall.start();
+
+			VisionThread visionThreadHatch = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
+				if (pipeline.filterContoursOutput().size() >= 2) {
+					Rect zero = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
+					Rect one = Imgproc.boundingRect(pipeline.filterContoursOutput().get(1));
+					synchronized (imgLock) {
+						hatchZeroX.setDouble(zero.x + (zero.width / 2));
+						hatchZeroY.setDouble(zero.y + (zero.width / 2));
+						hatchOneX.setDouble(one.x + (one.width / 2));
+						hatchOneY.setDouble(one.y + (one.width / 2));
 					}
 					
 					//x: (0, 320)
 				} else {
 					synchronized (imgLock) {
-						zeroX.setDouble(Double.MAX_VALUE / 2);
-						zeroY.setDouble(Double.MAX_VALUE / 2);
-						oneX.setDouble(Double.MAX_VALUE / 2);
-						oneY.setDouble(Double.MAX_VALUE / 2);
+						hatchZeroX.setDouble(Double.MAX_VALUE / 2);
+						hatchZeroY.setDouble(Double.MAX_VALUE / 2);
+						hatchOneX.setDouble(Double.MAX_VALUE / 2);
+						hatchOneY.setDouble(Double.MAX_VALUE / 2);
 					}
 				}
 				synchronized (imgLock) {
-					contoursCount.setDouble(pipeline.filterContoursOutput().size());
+					hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
 				}
 			});
-			visionThread.start();
+			visionThreadHatch.start();
 		}
 		
 		while (true) {
@@ -385,8 +401,8 @@ public final class Main {
 				right = p;
 		}
 		
-		if (left.y > right.y) {
-			return Direction.Right;
+		if (left == null || right == null || left.y > right.y) {
+			return Direction.Right; // if it always says right, then left/right remain null
 		} else {
 			return Direction.Left;
 		}
