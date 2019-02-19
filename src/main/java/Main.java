@@ -357,6 +357,7 @@ public final class Main {
 		NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
 		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
 		NetworkTableEntry debug = table.getEntry("debug");
+		NetworkTableEntry strings = table.getEntry("strings");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
@@ -365,20 +366,26 @@ public final class Main {
 
 		if (cameras.size() >= 2) { // both cameras exist
 			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
-				synchronized (imgLock) { debug.setNumber(1); }
+
                 ArrayList<Contour> contours = pipeline.filterContoursOutput().stream()
                         .map(mat -> {
                             Rect rect = Imgproc.boundingRect(mat);
-							synchronized (imgLock) { debug.setNumber(1.5); }
                             return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
                         }).sorted().collect(Collectors.toCollection(ArrayList::new));
-				synchronized (imgLock) { debug.setNumber(2); }
+
+				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
+				String d = "";
+				for (String dir: directions)
+					d += dir + " ";
+				synchronized (imgLock) {
+					strings.setString(d);
+				}
                 if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
                     contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
-				synchronized (imgLock) { debug.setNumber(3); }
+
                 if (!contours.isEmpty() && contours.get(contours.size()-1).direction == Direction.LEFT)
                     contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
-				synchronized (imgLock) { debug.setNumber(4); }
+
                 ArrayList<ContourPair> pairs = new ArrayList<>();
                 ContourPair currentPair = new ContourPair();
                 for (Contour contour : contours) {
@@ -392,10 +399,10 @@ public final class Main {
                         }
                     }
                 }
-				synchronized (imgLock) { debug.setNumber(5); }
-                double center = 184; // TODO: yay for magic numbers
+
+                double center = 156; // TODO: yay for magic numbers
                 pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
-				synchronized (imgLock) { debug.setNumber(6); }
+
 				if (!pairs.isEmpty()) {
 				    ContourPair pair = pairs.get(0);
 					synchronized (imgLock) {
@@ -442,9 +449,9 @@ public final class Main {
 		}
 		
 		if (left.y > right.y) {
-			return Direction.RIGHT;
-		} else {
 			return Direction.LEFT;
+		} else {
+			return Direction.RIGHT;
 		}
 	}
 	
