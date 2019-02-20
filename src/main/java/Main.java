@@ -400,7 +400,7 @@ public final class Main {
                     }
                 }
 
-                double center = 156; // TODO: yay for magic numbers
+                double center = 164; // TODO: yay for magic numbers
                 pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
 
 				if (!pairs.isEmpty()) {
@@ -411,7 +411,10 @@ public final class Main {
                         hatchOneX.setDouble(pair.right.center.x);
                         hatchOneY.setDouble(pair.right.center.y);
 					}
-					
+					//72, 254
+                    //122, 208
+
+
 					//x: (0, 320)
 				} else {
 					synchronized (imgLock) {
