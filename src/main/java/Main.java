@@ -426,6 +426,7 @@ public final class Main {
                 }
                 synchronized (imgLock) {
                     hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
+                    ntinst.startClientTeam(team);
                 }
             });
             visionThread.start();
