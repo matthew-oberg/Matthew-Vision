@@ -365,7 +365,7 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 2) { // both cameras exist
-			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
+            VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
 
                 ArrayList<Contour> contours = pipeline.filterContoursOutput().stream()
                         .map(mat -> {
@@ -373,17 +373,17 @@ public final class Main {
                             return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
                         }).sorted().collect(Collectors.toCollection(ArrayList::new));
 
-				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
-				String d = "";
-				for (String dir: directions)
-					d += dir + " ";
-				synchronized (imgLock) {
-					strings.setString(d);
-				}
+                String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
+                String d = "";
+                for (String dir : directions)
+                    d += dir + " ";
+                synchronized (imgLock) {
+                    strings.setString(d);
+                }
                 if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
                     contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
 
-                if (!contours.isEmpty() && contours.get(contours.size()-1).direction == Direction.LEFT)
+                if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
                     contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
 
                 ArrayList<ContourPair> pairs = new ArrayList<>();
@@ -403,42 +403,40 @@ public final class Main {
                 double center = 164; // TODO: yay for magic numbers
                 pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
 
-				if (!pairs.isEmpty()) {
-				    ContourPair pair = pairs.get(0);
-					synchronized (imgLock) {
+                if (!pairs.isEmpty()) {
+                    ContourPair pair = pairs.get(0);
+                    synchronized (imgLock) {
                         hatchZeroX.setDouble(pair.left.center.x);
                         hatchZeroY.setDouble(pair.left.center.y);
                         hatchOneX.setDouble(pair.right.center.x);
                         hatchOneY.setDouble(pair.right.center.y);
-					}
-					//72, 254
+                    }
+                    //72, 254
                     //122, 208
 
 
-					//x: (0, 320)
-				} else {
-					synchronized (imgLock) {
-						hatchZeroX.setDouble(Double.MAX_VALUE / 2);
-						hatchZeroY.setDouble(Double.MAX_VALUE / 2);
-						hatchOneX.setDouble(Double.MAX_VALUE / 2);
-						hatchOneY.setDouble(Double.MAX_VALUE / 2);
-					}
-				}
-				synchronized (imgLock) {
-					hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
-				}
-			});
-			visionThread.start();
-		}
-		
-		while (true) {
-			try {
-				Thread.sleep(10000);
-			} catch (InterruptedException ex) {
-				debug.setNumber(-1);
-				return;
-			}
-		}
+                    //x: (0, 320)
+                } else {
+                    synchronized (imgLock) {
+                        hatchZeroX.setDouble(Double.MAX_VALUE / 2);
+                        hatchZeroY.setDouble(Double.MAX_VALUE / 2);
+                        hatchOneX.setDouble(Double.MAX_VALUE / 2);
+                        hatchOneY.setDouble(Double.MAX_VALUE / 2);
+                    }
+                }
+                synchronized (imgLock) {
+                    hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
+                }
+            });
+            visionThread.start();
+
+            try {
+                visionThread.join();
+            } catch (InterruptedException ex) {
+                visionThread.interrupt();
+                System.exit(0);
+            }
+        }
 	}
 	
 	private static Direction getDirection(MatOfPoint contour) {
