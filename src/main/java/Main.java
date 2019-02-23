@@ -95,18 +95,7 @@ public final class Main {
 		}
     
 		team = teamElement.getAsInt();
-
-		if (obj.has("ntmode")) {
-			String str = obj.get("ntmode").getAsString();
-			if ("client".equalsIgnoreCase(str)) {
-				server = false;
-			} else if ("server".equalsIgnoreCase(str)) {
-				server = true;
-			} else {
-				parseError("could not understand ntmode value '" + str + "'");
-			}
-		}
-
+		
 		JsonElement camerasElement = obj.get("cameras");
 		
 		if (camerasElement == null) {
