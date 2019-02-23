@@ -37,7 +37,6 @@ public final class Main {
 	}
 
 	private static int team;
-	private static boolean server;
 	private static List<CameraConfig> cameraConfigs = new ArrayList<>();
 	
 	private static final Object imgLock = new Object();
@@ -296,13 +295,8 @@ public final class Main {
 		}
 
 		NetworkTableInstance ntinst = NetworkTableInstance.getDefault();
-		if (server) {
-			System.out.println("Setting up NetworkTables server");
-			ntinst.startServer();
-		} else {
-			System.out.println("Setting up NetworkTables client for team " + team);
-			ntinst.startClientTeam(team);
-		}
+		System.out.println("Setting up NetworkTables client for team " + team);
+		ntinst.startClientTeam(team);
 		
 		NetworkTable table = ntinst.getTable("vision");
 		NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
