@@ -95,7 +95,7 @@ public final class Main {
 		}
     
 		team = teamElement.getAsInt();
-		
+
 		JsonElement camerasElement = obj.get("cameras");
 		
 		if (camerasElement == null) {
@@ -286,7 +286,7 @@ public final class Main {
 		NetworkTableInstance ntinst = NetworkTableInstance.getDefault();
 		System.out.println("Setting up NetworkTables client for team " + team);
 		ntinst.startClientTeam(team);
-		
+
 		NetworkTable table = ntinst.getTable("vision");
 		NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
 		NetworkTableEntry hatchZeroY = table.getEntry("hatchZeroY");
@@ -358,7 +358,9 @@ public final class Main {
                 }
                 synchronized (imgLock) {
                     hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
-                    ntinst.startClientTeam(team);
+                    if (!ntinst.isConnected()) {
+						ntinst.startClientTeam(team);
+					}
                 }
             });
             visionThread.start();
