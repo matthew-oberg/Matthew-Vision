@@ -300,8 +300,14 @@ public final class Main {
 		NetworkTableEntry hatchOneX = table.getEntry("hatchOneX");
 		NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
 		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
-		NetworkTableEntry debug = table.getEntry("debug");
 		NetworkTableEntry strings = table.getEntry("strings");
+
+		NetworkTableEntry cargoZeroX = table.getEntry("cargoZeroX");
+		NetworkTableEntry cargoZeroY = table.getEntry("cargoZeroY");
+		NetworkTableEntry cargoOneX = table.getEntry("cargoOneX");
+		NetworkTableEntry cargoOneY = table.getEntry("cargoOneY");
+		NetworkTableEntry cargoContoursCount = table.getEntry("cargoContoursCount");
+		NetworkTableEntry cargoLR = table.getEntry("cargoLR");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
@@ -309,71 +315,135 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 2) { // both cameras exist
-            VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
+			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
 
-            	ArrayList<Contour> contours = pipeline.filterContoursOutput().stream().map(mat -> {
-                            Rect rect = Imgproc.boundingRect(mat);
-                            return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
-                }).sorted().collect(Collectors.toCollection(ArrayList::new));
+				ArrayList<Contour> contours = pipeline.filterContoursOutput().stream().map(mat -> {
+					Rect rect = Imgproc.boundingRect(mat);
+					return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
+				}).sorted().collect(Collectors.toCollection(ArrayList::new));
 
-                String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
-                String d = "";
-                for (String dir : directions)
-                    d += dir + " ";
-                synchronized (imgLock) {
-                    strings.setString(d);
-                }
-                if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
-                    contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
+				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
+				String d = "";
+				for (String dir : directions)
+					d += dir + " ";
+				synchronized (imgLock) {
+					cargoLR.setString(d);
+				}
+				if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
+					contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
 
-                if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
-                    contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
+				if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
+					contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
 
-                ArrayList<ContourPair> pairs = new ArrayList<>();
-                ContourPair currentPair = new ContourPair();
-                for (Contour contour : contours) {
-                    if (contour.direction == Direction.LEFT) {
-                        currentPair = new ContourPair();
-                        currentPair.left = contour;
-                    } else {
-                        currentPair.right = contour;
-                        if (currentPair.isComplete()) {
-                            pairs.add(currentPair);
-                        }
-                    }
-                }
+				ArrayList<ContourPair> pairs = new ArrayList<>();
+				ContourPair currentPair = new ContourPair();
+				for (Contour contour : contours) {
+					if (contour.direction == Direction.LEFT) {
+						currentPair = new ContourPair();
+						currentPair.left = contour;
+					} else {
+						currentPair.right = contour;
+						if (currentPair.isComplete()) {
+							pairs.add(currentPair);
+						}
+					}
+				}
 
-                double center = 164; // TODO: yay for magic numbers
-                pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
+				double center = 164; // TODO: yay for magic numbers
+				pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
 
-                if (!pairs.isEmpty()) {
-                    ContourPair pair = pairs.get(0);
-                    synchronized (imgLock) {
-                        hatchZeroX.setDouble(pair.left.center.x);
-                        hatchZeroY.setDouble(pair.left.center.y);
-                        hatchOneX.setDouble(pair.right.center.x);
-                        hatchOneY.setDouble(pair.right.center.y);
-                    }
-                    //x: (0, 320)
-                } else {
-                    synchronized (imgLock) {
-                        hatchZeroX.setDouble(Double.MAX_VALUE / 2);
-                        hatchZeroY.setDouble(Double.MAX_VALUE / 2);
-                        hatchOneX.setDouble(Double.MAX_VALUE / 2);
-                        hatchOneY.setDouble(Double.MAX_VALUE / 2);
-                    }
-                }
-                synchronized (imgLock) {
-                    hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
-                    if (!ntinst.isConnected()) {
+				if (!pairs.isEmpty()) {
+					ContourPair pair = pairs.get(0);
+					synchronized (imgLock) {
+						hatchZeroX.setDouble(pair.left.center.x);
+						hatchZeroY.setDouble(pair.left.center.y);
+						hatchOneX.setDouble(pair.right.center.x);
+						hatchOneY.setDouble(pair.right.center.y);
+					}
+					//x: (0, 320)
+				} else {
+					synchronized (imgLock) {
+						hatchZeroX.setDouble(Double.MAX_VALUE / 2);
+						hatchZeroY.setDouble(Double.MAX_VALUE / 2);
+						hatchOneX.setDouble(Double.MAX_VALUE / 2);
+						hatchOneY.setDouble(Double.MAX_VALUE / 2);
+					}
+				}
+				synchronized (imgLock) {
+					hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
+					if (!ntinst.isConnected()) {
 						ntinst.startClientTeam(team);
 					}
-                }
-            });
-            visionThread.start();
+				}
+			});
+			visionThread.start();
+
+			VisionThread visionThreadCargo = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {
+
+				ArrayList<Contour> contours = pipeline.filterContoursOutput().stream().map(mat -> {
+					Rect rect = Imgproc.boundingRect(mat);
+					return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
+				}).sorted().collect(Collectors.toCollection(ArrayList::new));
+
+				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
+				String d = "";
+				for (String dir : directions)
+					d += dir + " ";
+				synchronized (imgLock) {
+					strings.setString(d);
+				}
+				if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
+					contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
+
+				if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
+					contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
+
+				ArrayList<ContourPair> pairs = new ArrayList<>();
+				ContourPair currentPair = new ContourPair();
+				for (Contour contour : contours) {
+					if (contour.direction == Direction.LEFT) {
+						currentPair = new ContourPair();
+						currentPair.left = contour;
+					} else {
+						currentPair.right = contour;
+						if (currentPair.isComplete()) {
+							pairs.add(currentPair);
+						}
+					}
+				}
+
+				double centerCargo = 164; // TODO: yay for magic numbers
+				pairs.sort(Comparator.comparingDouble(o -> o.error(centerCargo)));
+
+				if (!pairs.isEmpty()) {
+					ContourPair pair = pairs.get(0);
+					synchronized (imgLock) {
+						cargoZeroX.setDouble(pair.left.center.x);
+						cargoZeroY.setDouble(pair.left.center.y);
+						cargoOneX.setDouble(pair.right.center.x);
+						cargoOneY.setDouble(pair.right.center.y);
+					}
+					//x: (0, 320)
+				} else {
+					synchronized (imgLock) {
+						cargoZeroX.setDouble(Double.MAX_VALUE / 2);
+						cargoZeroY.setDouble(Double.MAX_VALUE / 2);
+						cargoOneX.setDouble(Double.MAX_VALUE / 2);
+						cargoOneY.setDouble(Double.MAX_VALUE / 2);
+					}
+				}
+				synchronized (imgLock) {
+					cargoContoursCount.setDouble(pipeline.filterContoursOutput().size());
+					if (!ntinst.isConnected()) {
+						ntinst.startClientTeam(team);
+					}
+				}
+			});
+			visionThreadCargo.start();
 
             try {
                 visionThread.join();
+				visionThreadCargo.join();
             } catch (InterruptedException ex) {
                 visionThread.interrupt();
                 System.exit(0);
