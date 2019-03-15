@@ -25,6 +25,7 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.*;
 import edu.wpi.first.vision.VisionPipeline;
+import edu.wpi.first.vision.VisionRunner;
 import edu.wpi.first.vision.VisionThread;
 
 import org.opencv.core.Mat;
@@ -250,11 +251,16 @@ public final class Main {
 	    private Direction direction;
 	    private Point center;
 
+	    public Contour(MatOfPoint mat) {
+			Rect rect = Imgproc.boundingRect(mat);
+			this.direction = getDirection(mat);
+			this.center = new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0);
+		}
+
 	    public Contour(Direction direction, Point center) {
             this.direction = direction;
             this.center = center;
         }
-
 
         @Override
         public int compareTo(Contour o) {
@@ -295,12 +301,13 @@ public final class Main {
 		ntinst.startClientTeam(team);
 
 		NetworkTable table = ntinst.getTable("vision");
+
 		NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
 		NetworkTableEntry hatchZeroY = table.getEntry("hatchZeroY");
 		NetworkTableEntry hatchOneX = table.getEntry("hatchOneX");
 		NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
 		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
-		NetworkTableEntry strings = table.getEntry("strings");
+		NetworkTableEntry hatchLR = table.getEntry("hatchLR"); // TODO: update
 
 		NetworkTableEntry cargoZeroX = table.getEntry("cargoZeroX");
 		NetworkTableEntry cargoZeroY = table.getEntry("cargoZeroY");
@@ -315,140 +322,88 @@ public final class Main {
 		}
 
 		if (cameras.size() >= 2) { // both cameras exist
-			VisionThread visionThread = new VisionThread(cameras.get(1), new DetectDouble(), pipeline -> {
-
-				ArrayList<Contour> contours = pipeline.filterContoursOutput().stream().map(mat -> {
-					Rect rect = Imgproc.boundingRect(mat);
-					return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
-				}).sorted().collect(Collectors.toCollection(ArrayList::new));
-
-				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
-				String d = "";
-				for (String dir : directions)
-					d += dir + " ";
-				synchronized (imgLock) {
-					cargoLR.setString(d);
-				}
-				if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
-					contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
-
-				if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
-					contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
-
-				ArrayList<ContourPair> pairs = new ArrayList<>();
-				ContourPair currentPair = new ContourPair();
-				for (Contour contour : contours) {
-					if (contour.direction == Direction.LEFT) {
-						currentPair = new ContourPair();
-						currentPair.left = contour;
-					} else {
-						currentPair.right = contour;
-						if (currentPair.isComplete()) {
-							pairs.add(currentPair);
-						}
-					}
-				}
-
-				double center = 164; // TODO: yay for magic numbers
-				pairs.sort(Comparator.comparingDouble(o -> o.error(center)));
-
-				if (!pairs.isEmpty()) {
-					ContourPair pair = pairs.get(0);
-					synchronized (imgLock) {
-						hatchZeroX.setDouble(pair.left.center.x);
-						hatchZeroY.setDouble(pair.left.center.y);
-						hatchOneX.setDouble(pair.right.center.x);
-						hatchOneY.setDouble(pair.right.center.y);
-					}
-					//x: (0, 320)
-				} else {
-					synchronized (imgLock) {
-						hatchZeroX.setDouble(Double.MAX_VALUE / 2);
-						hatchZeroY.setDouble(Double.MAX_VALUE / 2);
-						hatchOneX.setDouble(Double.MAX_VALUE / 2);
-						hatchOneY.setDouble(Double.MAX_VALUE / 2);
-					}
-				}
-				synchronized (imgLock) {
-					hatchContoursCount.setDouble(pipeline.filterContoursOutput().size());
-					if (!ntinst.isConnected()) {
-						ntinst.startClientTeam(team);
-					}
-				}
-			});
-			visionThread.start();
-
-			VisionThread visionThreadCargo = new VisionThread(cameras.get(0), new DetectDouble(), pipeline -> {
-
-				ArrayList<Contour> contours = pipeline.filterContoursOutput().stream().map(mat -> {
-					Rect rect = Imgproc.boundingRect(mat);
-					return new Contour(getDirection(mat), new Point(rect.x + rect.width / 2.0, rect.y + rect.height / 2.0));
-				}).sorted().collect(Collectors.toCollection(ArrayList::new));
-
-				String[] directions = contours.stream().map(c -> c.direction.toString()).collect(Collectors.toList()).toArray(new String[contours.size()]);
-				String d = "";
-				for (String dir : directions)
-					d += dir + " ";
-				synchronized (imgLock) {
-					strings.setString(d);
-				}
-				if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
-					contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
-
-				if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
-					contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
-
-				ArrayList<ContourPair> pairs = new ArrayList<>();
-				ContourPair currentPair = new ContourPair();
-				for (Contour contour : contours) {
-					if (contour.direction == Direction.LEFT) {
-						currentPair = new ContourPair();
-						currentPair.left = contour;
-					} else {
-						currentPair.right = contour;
-						if (currentPair.isComplete()) {
-							pairs.add(currentPair);
-						}
-					}
-				}
-
-				double centerCargo = 164; // TODO: yay for magic numbers
-				pairs.sort(Comparator.comparingDouble(o -> o.error(centerCargo)));
-
-				if (!pairs.isEmpty()) {
-					ContourPair pair = pairs.get(0);
-					synchronized (imgLock) {
-						cargoZeroX.setDouble(pair.left.center.x);
-						cargoZeroY.setDouble(pair.left.center.y);
-						cargoOneX.setDouble(pair.right.center.x);
-						cargoOneY.setDouble(pair.right.center.y);
-					}
-					//x: (0, 320)
-				} else {
-					synchronized (imgLock) {
-						cargoZeroX.setDouble(Double.MAX_VALUE / 2);
-						cargoZeroY.setDouble(Double.MAX_VALUE / 2);
-						cargoOneX.setDouble(Double.MAX_VALUE / 2);
-						cargoOneY.setDouble(Double.MAX_VALUE / 2);
-					}
-				}
-				synchronized (imgLock) {
-					cargoContoursCount.setDouble(pipeline.filterContoursOutput().size());
-					if (!ntinst.isConnected()) {
-						ntinst.startClientTeam(team);
-					}
-				}
-			});
+			VisionThread visionThreadCargo = new VisionThread(cameras.get(0), new DetectDouble(),
+					constructListener(cargoZeroX, cargoZeroY, cargoOneX, cargoOneY, cargoContoursCount, cargoLR, ntinst));
 			visionThreadCargo.start();
 
+			VisionThread visionThreadHatch = new VisionThread(cameras.get(1), new DetectDouble(),
+					constructListener(hatchZeroX, hatchZeroY, hatchOneX, hatchOneY, hatchContoursCount, hatchLR, ntinst));
+			visionThreadHatch.start();
+
             try {
-                visionThread.join();
-				visionThreadCargo.join();
+                visionThreadCargo.join();
+				visionThreadHatch.join();
             } catch (InterruptedException ex) {
-                visionThread.interrupt();
+                visionThreadCargo.interrupt();
+                visionThreadHatch.interrupt();
                 System.exit(0);
             }
         }
+	}
+
+	private static VisionRunner.Listener<DetectDouble> constructListener(
+			NetworkTableEntry zeroX, NetworkTableEntry zeroY,
+			NetworkTableEntry oneX, NetworkTableEntry oneY,
+			NetworkTableEntry contoursCount, NetworkTableEntry leftRight,
+			NetworkTableInstance ntinst) {
+		return pipeline -> {
+			ArrayList<Contour> contours = pipeline.filterContoursOutput().stream()
+					.map(Contour::new).sorted().collect(Collectors.toCollection(ArrayList::new));
+
+			String directions = contours.stream().map(c -> c.direction.toString())
+					.reduce("", (acc, next) -> acc + next);
+
+			synchronized (imgLock) {
+				leftRight.setString(directions);
+			}
+
+			if (!contours.isEmpty() && contours.get(0).direction == Direction.RIGHT)
+				contours.add(0, new Contour(Direction.LEFT, new Point(-10, 0))); // off screen to left
+
+			if (!contours.isEmpty() && contours.get(contours.size() - 1).direction == Direction.LEFT)
+				contours.add(new Contour(Direction.RIGHT, new Point(400, 0))); // off screen to right
+
+			ArrayList<ContourPair> pairs = new ArrayList<>();
+			ContourPair currentPair = new ContourPair();
+			for (Contour contour : contours) {
+				if (contour.direction == Direction.LEFT) {
+					currentPair = new ContourPair();
+					currentPair.left = contour;
+				} else {
+					currentPair.right = contour;
+					if (currentPair.isComplete()) {
+						pairs.add(currentPair);
+					}
+				}
+			}
+
+			double centerCargo = 160; // should always be close enough to center
+			pairs.sort(Comparator.comparingDouble(o -> o.error(centerCargo)));
+
+			if (!pairs.isEmpty()) {
+				ContourPair pair = pairs.get(0);
+				synchronized (imgLock) {
+					zeroX.setDouble(pair.left.center.x);
+					zeroY.setDouble(pair.left.center.y);
+					oneX.setDouble(pair.right.center.x);
+					oneY.setDouble(pair.right.center.y);
+				}
+				//x: (0, 320)
+			} else {
+				synchronized (imgLock) {
+					zeroX.setDouble(Double.MAX_VALUE / 2);
+					zeroY.setDouble(Double.MAX_VALUE / 2);
+					oneX.setDouble(Double.MAX_VALUE / 2);
+					oneY.setDouble(Double.MAX_VALUE / 2);
+				}
+			}
+			synchronized (imgLock) {
+				contoursCount.setDouble(pipeline.filterContoursOutput().size());
+				if (!ntinst.isConnected()) {
+					ntinst.startClientTeam(team);
+				}
+			}
+		};
 	}
 	
 	private static Direction getDirection(MatOfPoint contour) {
