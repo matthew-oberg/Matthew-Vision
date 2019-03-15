@@ -309,12 +309,12 @@ public final class Main {
 		NetworkTableEntry hatchContoursCount = table.getEntry("hatchContoursCount");
 		NetworkTableEntry hatchLR = table.getEntry("hatchLR"); // TODO: update
 
-		NetworkTableEntry cargoZeroX = table.getEntry("cargoZeroX");
-		NetworkTableEntry cargoZeroY = table.getEntry("cargoZeroY");
-		NetworkTableEntry cargoOneX = table.getEntry("cargoOneX");
-		NetworkTableEntry cargoOneY = table.getEntry("cargoOneY");
-		NetworkTableEntry cargoContoursCount = table.getEntry("cargoContoursCount");
-		NetworkTableEntry cargoLR = table.getEntry("cargoLR");
+		NetworkTableEntry ballZeroX = table.getEntry("ballZeroX");
+		NetworkTableEntry ballZeroY = table.getEntry("ballZeroY");
+		NetworkTableEntry ballOneX = table.getEntry("ballOneX");
+		NetworkTableEntry ballOneY = table.getEntry("ballOneY");
+		NetworkTableEntry ballContoursCount = table.getEntry("ballContoursCount");
+		NetworkTableEntry ballLR = table.getEntry("ballLR");
 
 		List<VideoSource> cameras = new ArrayList<>();
 		for (CameraConfig cameraConfig : cameraConfigs) {
@@ -323,7 +323,7 @@ public final class Main {
 
 		if (cameras.size() >= 2) { // both cameras exist
 			VisionThread visionThreadCargo = new VisionThread(cameras.get(0), new DetectDouble(),
-					constructListener(cargoZeroX, cargoZeroY, cargoOneX, cargoOneY, cargoContoursCount, cargoLR, ntinst));
+					constructListener(ballZeroX, ballZeroY, ballOneX, ballOneY, ballContoursCount, ballLR, ntinst));
 			visionThreadCargo.start();
 
 			VisionThread visionThreadHatch = new VisionThread(cameras.get(1), new DetectDouble(),
